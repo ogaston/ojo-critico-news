@@ -1,0 +1,10 @@
+news_collector/__pycache__/
+news_collector/spiders/__pycache__/
+news-debate-synth/__pycache__/
+news-debate-synth/venv/
+news-website/node_modules/
+news-website/.next/
+news-website/venv/
+news-api/node_modules/
+.devcontainer/
+.env

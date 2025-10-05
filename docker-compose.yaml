@@ -1,0 +1,111 @@
+services:
+  mongodb:
+    image: mongo:7
+    container_name: news-mongodb
+    restart: unless-stopped
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=admin123
+      - MONGO_INITDB_DATABASE=news_db
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - news-network
+
+  mongo-express:
+    image: mongo-express:latest
+    container_name: news-mongo-express
+    restart: unless-stopped
+    ports:
+      - "8081:8081"
+    environment:
+      - ME_CONFIG_MONGODB_ADMINUSERNAME=admin
+      - ME_CONFIG_MONGODB_ADMINPASSWORD=admin123
+      - ME_CONFIG_MONGODB_URL=mongodb://admin:admin123@mongodb:27017/
+      - ME_CONFIG_BASICAUTH=false
+    depends_on:
+      - mongodb
+    networks:
+      - news-network
+
+  news-collector:
+    build:
+      context: news_collector
+      dockerfile: Dockerfile
+    volumes:
+      - ./news_collector:/usr/src/app
+      - news_outputs:/usr/src/app/outputs
+    environment:
+      - TZ=America/Santo_Domingo
+      - MONGO_URI=mongodb://admin:admin123@mongodb:27017/
+      - MONGO_DB=news_db
+    restart: unless-stopped
+    container_name: news-collector-scheduler
+    depends_on:
+      - mongodb
+    networks:
+      - news-network
+
+  news-api:
+    build:
+      context: news-api
+      dockerfile: Dockerfile
+    container_name: news-api-server
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - MONGO_URI=mongodb://admin:admin123@mongodb:27017/
+      - MONGO_DB=news_db
+    depends_on:
+      - mongodb
+    networks:
+      - news-network
+
+  news-debate-synth:
+    build:
+      context: news-debate-synth
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    volumes:
+      - ./news-debate-synth:/usr/src/app
+    environment:
+      - TZ=America/Santo_Domingo
+      - MONGO_URI=mongodb://admin:admin123@mongodb:27017/
+      - MONGO_DB=news_db
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    restart: unless-stopped
+    container_name: news-debate-synth-processor
+    depends_on:
+      - mongodb
+      - news-collector
+    networks:
+      - news-network
+
+  news-website:
+    build:
+      context: news-website
+      dockerfile: Dockerfile
+    container_name: news-website-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NEWS_API_BASE_URL=http://news-api:8000/api/v1
+    depends_on:
+      - news-api
+    networks:
+      - news-network
+
+volumes:
+  news_outputs:
+    driver: local
+  mongo_data:
+    driver: local
+
+networks:
+  news-network:
+    driver: bridge
